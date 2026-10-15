@@ -1,0 +1,1133 @@
+                        <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TransitFind AI - Lost and Found Dashboard</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        transit: {
+                            50: '#eefcf9',
+                            100: '#d1f8f2',
+                            500: '#00897b',
+                            600: '#0d7367',
+                            700: '#0a5c53',
+                            900: '#063d37'
+                        }
+                    },
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .transition-all { transition: all 0.25s ease-in-out; }
+        /* Custom scrollbar for dashboard tables */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans antialiased min-h-screen flex flex-col justify-between">
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- Claim Modal / Secure Claim Dialog -->
+    <div id="claim-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl transform transition-all">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-bold text-slate-900 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-transit-600"></i> Start Secure Claim
+                </h3>
+                <button onclick="closeClaimModal()" class="text-slate-400 hover:text-slate-600 p-2 rounded-lg"><i class="fa-solid fa-xmark text-lg"></i></button>
+            </div>
+            <p class="text-sm text-slate-600 mb-4">To ensure safe return, please verify ownership of <span id="claim-item-name" class="font-semibold text-slate-900">Black Backpack</span> (Ref: #TF-1042).</p>
+            <form onsubmit="submitClaim(event)" class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Your Full Name *</label>
+                    <input type="text" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-transit-500" placeholder="Rahul Sharma">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Phone Number (SMS Verification) *</label>
+                    <input type="tel" required class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-transit-500" placeholder="+91 98765 43210">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-slate-700 mb-1">Unique Identifying Detail (e.g., contents, keyring) *</label>
+                    <textarea required rows="3" class="w-full px-3 py-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-transit-500" placeholder="Contains a red keychain and a silver laptop charger..."></textarea>
+                </div>
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3 text-xs text-amber-800 flex gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-600 mt-0.5"></i>
+                    <span>False claims violate transit safety policies and may lead to verification holds.</span>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button type="button" onclick="closeClaimModal()" class="flex-1 px-4 py-2 border border-slate-300 text-slate-700 rounded-lg text-sm font-medium hover:bg-slate-50">Cancel</button>
+                    <button type="submit" class="flex-1 px-4 py-2 bg-transit-600 text-white rounded-lg text-sm font-medium hover:bg-transit-700 shadow-sm">Submit Claim</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Navigation Header -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-40">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+            <div class="flex items-center gap-8">
+                <a href="#" onclick="switchView('home')" class="flex items-center gap-2.5 font-bold text-xl text-slate-900">
+                    <div class="w-10 h-10 bg-transit-600 rounded-xl flex items-center justify-center text-white shadow-md">
+                        <i class="fa-solid fa-train-subway text-lg"></i>
+                    </div>
+                    <span>TransitFind <span class="text-transit-600">AI</span></span>
+                </a>
+                <nav class="hidden md:flex items-center gap-1">
+                    <button onclick="switchView('home')" id="nav-home" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all">How it works</button>
+                    <button onclick="switchView('search')" id="nav-search" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all">Search items</button>
+                    <button onclick="switchView('operations')" id="nav-operations" class="nav-btn px-3 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-all">For transit teams</button>
+                </nav>
+            </div>
+            <div class="flex items-center gap-4">
+                <div class="hidden sm:flex items-center gap-2 text-sm text-slate-600 border-r border-slate-200 pr-4">
+                    <div class="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-semibold text-xs">RS</div>
+                    <span class="font-medium">Hi, Rahul</span>
+                </div>
+                <button onclick="switchView('report')" class="bg-transit-600 hover:bg-transit-700 text-white px-4 py-2 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-all">
+                    <i class="fa-solid fa-plus text-xs"></i> Report an item
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow">
+
+        <!-- VIEW 1: HOME / LANDING PAGE -->
+        <div id="view-home" class="view-section">
+            <!-- Hero Banner -->
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-12">
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                    <div class="lg:col-span-7 space-y-6">
+                        <h1 class="text-4xl md:text-5xl font-extrabold text-slate-900 tracking-tight leading-tight">
+                            Lost something on your journey?
+                        </h1>
+                        <p class="text-lg text-slate-600 max-w-xl">
+                            AI helps reunite lost belongings with the people who need them through automated visual recognition and route matching.
+                        </p>
+                        
+                        <!-- Action Cards -->
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div class="bg-transit-50/80 border border-transit-100 p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition-all">
+                                <div>
+                                    <div class="w-10 h-10 rounded-xl bg-transit-100 flex items-center justify-center text-transit-600 mb-3">
+                                        <i class="fa-solid fa-bag-shopping text-lg"></i>
+                                    </div>
+                                    <h3 class="font-bold text-slate-900 text-base mb-1">I lost something</h3>
+                                    <p class="text-xs text-slate-600 mb-4">Report a lost item or missing person and find your belongings.</p>
+                                </div>
+                                <button onclick="switchView('report'); setReportType('Lost')" class="w-full bg-transit-600 hover:bg-transit-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all">
+                                    <span>Find my item</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+                                </button>
+                            </div>
+
+                            <div class="bg-emerald-50/60 border border-emerald-100 p-5 rounded-2xl flex flex-col justify-between hover:shadow-md transition-all">
+                                <div>
+                                    <div class="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-700 mb-3">
+                                        <i class="fa-solid fa-hand-holding-heart text-lg"></i>
+                                    </div>
+                                    <h3 class="font-bold text-slate-900 text-base mb-1">I found something</h3>
+                                    <p class="text-xs text-slate-600 mb-4">Hand in an item or a person you found on public transport.</p>
+                                </div>
+                                <button onclick="switchView('report'); setReportType('Found')" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-4 rounded-xl text-sm flex items-center justify-center gap-2 shadow-sm transition-all">
+                                    <span>Report found item</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Quick Search Bar -->
+                        <div class="pt-2">
+                            <div class="relative flex items-center">
+                                <span class="absolute left-4 text-slate-400"><i class="fa-solid fa-magnifying-glass"></i></span>
+                                <input type="text" id="home-search-input" placeholder="Describe your item, route or station..." class="w-full pl-11 pr-32 py-3.5 bg-white border border-slate-300 rounded-2xl text-sm shadow-sm focus:outline-none focus:ring-2 focus:ring-transit-500">
+                                <button onclick="executeQuickSearch()" class="absolute right-2 bg-transit-600 hover:bg-transit-700 text-white px-5 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all">
+                                    Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Hero Banner Image -->
+                    <div class="lg:col-span-5">
+                        <div class="relative rounded-3xl overflow-hidden shadow-xl border border-slate-200 h-80 sm:h-96">
+                            <img src="https://images.unsplash.com/photo-1544620347-c4fd4a3d5957?auto=format&fit=crop&w=800&q=80" alt="Lost and Found Transit Box" class="w-full h-full object-cover">
+                            <div class="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent flex items-end p-6">
+                                <div class="text-white">
+                                    <span class="bg-transit-600 text-xs px-2.5 py-1 rounded-full font-semibold">Active Transit Hub</span>
+                                    <h4 class="font-bold text-lg mt-1">CSMT Central Station Lost & Found</h4>
+                                    <p class="text-xs text-slate-200">Over 1,240 items reunited this month.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Feature Highlights -->
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 my-16 pt-8 border-t border-slate-200">
+                    <div class="flex items-start gap-4 p-4">
+                        <div class="w-12 h-12 rounded-2xl bg-transit-100 text-transit-600 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-camera text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-900 mb-1">Image-based matching</h4>
+                            <p class="text-xs text-slate-600 leading-relaxed">AI compares visual features to find similar items, even with vague descriptions.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-4 p-4">
+                        <div class="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-location-dot text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-900 mb-1">Route & time context</h4>
+                            <p class="text-xs text-slate-600 leading-relaxed">Uses your route, station, date and time to improve match accuracy.</p>
+                        </div>
+                    </div>
+
+                    <div class="flex items-start gap-4 p-4">
+                        <div class="w-12 h-12 rounded-2xl bg-sky-100 text-sky-700 flex items-center justify-center shrink-0">
+                            <i class="fa-solid fa-shield-check text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="font-bold text-slate-900 mb-1">Verified handovers</h4>
+                            <p class="text-xs text-slate-600 leading-relaxed">Secure process to confirm ownership and ensure safe return.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Potential Matches -->
+                <div class="mb-12">
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="text-2xl font-bold text-slate-900">Recent potential matches</h3>
+                        <button onclick="switchView('search')" class="text-transit-600 hover:text-transit-700 font-semibold text-sm flex items-center gap-1">
+                            View all <i class="fa-solid fa-arrow-right text-xs"></i>
+                        </button>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6" id="home-matches-grid">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- Safety Alert Banner -->
+                <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center gap-3 text-amber-900 text-sm">
+                    <i class="fa-solid fa-triangle-exclamation text-amber-600 text-lg shrink-0"></i>
+                    <div><span class="font-semibold">Missing person or immediate danger?</span> Call 112 or contact station security immediately.</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 2: SEARCH & RESULTS DASHBOARD -->
+        <div id="view-search" class="view-section hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="mb-6">
+                    <h1 class="text-3xl font-extrabold text-slate-900">Find what you lost</h1>
+                    <p class="text-sm text-slate-600 mt-1">Search through lost and found items using images, details or location.</p>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 mb-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="fa-solid fa-box text-transit-600 mr-1"></i> Category</label>
+                        <select id="filter-category" onchange="filterItems()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-transit-500">
+                            <option value="">All Categories</option>
+                            <option value="Bags">Bags & Luggage</option>
+                            <option value="Electronics">Electronics</option>
+                            <option value="Accessories">Accessories & Umbrellas</option>
+                            <option value="Bottles">Bottles & Drinkware</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="fa-solid fa-train text-transit-600 mr-1"></i> Transport Mode</label>
+                        <select id="filter-mode" onchange="filterItems()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-transit-500">
+                            <option value="">All Modes</option>
+                            <option value="Metro">Metro Line</option>
+                            <option value="Bus">City Bus</option>
+                            <option value="Suburban">Suburban Rail</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="fa-solid fa-location-dot text-transit-600 mr-1"></i> Station / Location</label>
+                        <select id="filter-station" onchange="filterItems()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-transit-500">
+                            <option value="">All Stations</option>
+                            <option value="CSMT Bus Stand">CSMT Bus Stand</option>
+                            <option value="Pune Station">Pune Station</option>
+                            <option value="Dadar Station">Dadar Station</option>
+                            <option value="Andheri Station">Andheri Station</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="fa-regular fa-calendar text-transit-600 mr-1"></i> Date Range</label>
+                        <input type="date" id="filter-date" onchange="filterItems()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-transit-500">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1"><i class="fa-solid fa-palette text-transit-600 mr-1"></i> Color</label>
+                        <select id="filter-color" onchange="filterItems()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-transit-500">
+                            <option value="">Any Color</option>
+                            <option value="Black">Black</option>
+                            <option value="Silver">Silver</option>
+                            <option value="Blue">Blue</option>
+                            <option value="White">White</option>
+                        </select>
+                    </div>
+                    <div class="sm:col-span-2 lg:col-span-5 flex gap-2">
+                        <div class="relative flex-grow">
+                            <span class="absolute left-3.5 top-3 text-slate-400"><i class="fa-solid fa-magnifying-glass"></i></span>
+                            <input type="text" id="search-keyword" oninput="filterItems()" placeholder="Describe your item, route or station..." class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-transit-500">
+                        </div>
+                        <button onclick="resetFilters()" class="px-4 py-2.5 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-xl text-sm font-semibold transition-all">Reset</button>
+                    </div>
+                </div>
+
+                <!-- Results Header & Sorting -->
+                <div class="flex justify-between items-center mb-4">
+                    <h2 class="text-lg font-bold text-slate-900" id="results-count-text">Found 6 results</h2>
+                    <div class="flex items-center gap-2 text-sm">
+                        <span class="text-slate-500 text-xs">Sort by:</span>
+                        <select onchange="sortItems(this.value)" class="bg-white border border-slate-300 rounded-lg px-2 py-1 text-xs font-medium text-slate-700 focus:outline-none">
+                            <option value="match">Most relevant</option>
+                            <option value="date">Newest first</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Results Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6" id="search-results-grid">
+                    <!-- Populated by JS -->
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 3: REPORT AN ITEM WIZARD -->
+        <div id="view-report" class="view-section hidden">
+            <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="mb-6">
+                    <h1 class="text-3xl font-extrabold text-slate-900">Report an item</h1>
+                    <p class="text-sm text-slate-600 mt-1">Help us get it back to you. Provide the details below to report a lost or found item.</p>
+                </div>
+
+                <!-- Step Progress Bar -->
+                <div class="grid grid-cols-3 gap-4 mb-8">
+                    <div id="step-indicator-1" class="flex items-center gap-3 p-3 rounded-2xl bg-transit-600 text-white shadow-sm transition-all">
+                        <div class="w-8 h-8 rounded-full bg-white text-transit-700 font-bold flex items-center justify-center text-sm">1</div>
+                        <div>
+                            <div class="text-xs uppercase tracking-wider font-semibold opacity-80">Step 1</div>
+                            <div class="text-sm font-bold">Item details</div>
+                        </div>
+                    </div>
+                    <div id="step-indicator-2" class="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-200 text-slate-700 transition-all">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-sm">2</div>
+                        <div>
+                            <div class="text-xs uppercase tracking-wider font-semibold text-slate-400">Step 2</div>
+                            <div class="text-sm font-bold">Journey details</div>
+                        </div>
+                    </div>
+                    <div id="step-indicator-3" class="flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-200 text-slate-700 transition-all">
+                        <div class="w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-sm">3</div>
+                        <div>
+                            <div class="text-xs uppercase tracking-wider font-semibold text-slate-400">Step 3</div>
+                            <div class="text-sm font-bold">Contact & review</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    <!-- Form Container -->
+                    <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                        <form id="report-form" onsubmit="handleReportSubmit(event)">
+                            
+                            <!-- STEP 1 FORM -->
+                            <div id="report-step-1" class="space-y-5">
+                                <h3 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Item details</h3>
+                                
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1.5">Report type *</label>
+                                    <div class="flex gap-4">
+                                        <label class="flex-1 border border-slate-300 rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 has-[:checked]:border-transit-600 has-[:checked]:bg-transit-50">
+                                            <input type="radio" name="reportType" value="Lost" checked class="text-transit-600 focus:ring-transit-500">
+                                            <span class="text-sm font-semibold text-slate-800">Lost</span>
+                                        </label>
+                                        <label class="flex-1 border border-slate-300 rounded-xl p-3 flex items-center justify-center gap-2 cursor-pointer hover:bg-slate-50 has-[:checked]:border-emerald-600 has-[:checked]:bg-emerald-50">
+                                            <input type="radio" name="reportType" value="Found" class="text-emerald-600 focus:ring-emerald-500">
+                                            <span class="text-sm font-semibold text-slate-800">Found</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Category *</label>
+                                        <select required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-transit-500">
+                                            <option value="">Select category</option>
+                                            <option value="Bags">Bags & Luggage</option>
+                                            <option value="Electronics">Electronics & Phones</option>
+                                            <option value="Accessories">Accessories</option>
+                                            <option value="Bottles">Bottles & Drinkware</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Item name *</label>
+                                        <input type="text" required placeholder="e.g. Black backpack" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-transit-500">
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Color</label>
+                                        <select class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-transit-500">
+                                            <option value="">Select color</option>
+                                            <option value="Black">Black</option>
+                                            <option value="Silver">Silver</option>
+                                            <option value="Blue">Blue</option>
+                                            <option value="Red">Red</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Brand <span class="text-slate-400 font-normal">(optional)</span></label>
+                                        <input type="text" placeholder="e.g. Nike, Dell, etc." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-transit-500">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Distinctive details <span class="text-slate-400 font-normal">(optional)</span></label>
+                                    <textarea rows="2" placeholder="e.g. Red zipper, sticker, scratches..." class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-transit-500"></textarea>
+                                </div>
+
+                                <!-- Photo Upload Dropzone -->
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Upload photos *</label>
+                                    <div class="border-2 border-dashed border-slate-300 rounded-2xl p-6 text-center hover:border-transit-500 bg-slate-50 transition-all cursor-pointer">
+                                        <div class="w-12 h-12 rounded-2xl bg-transit-100 text-transit-600 flex items-center justify-center mx-auto mb-2">
+                                            <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+                                        </div>
+                                        <p class="text-xs font-semibold text-slate-800">Drag & drop images here or click to browse</p>
+                                        <p class="text-[11px] text-slate-500 mt-1">Supports JPG, PNG (Max 5MB each)</p>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-2 text-[11px] text-slate-500">
+                                        <i class="fa-solid fa-shield-halved text-emerald-600"></i>
+                                        <span>Your photos are private and secure.</span>
+                                    </div>
+                                </div>
+
+                                <div class="flex justify-end pt-4">
+                                    <button type="button" onclick="nextReportStep(2)" class="bg-transit-600 hover:bg-transit-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all flex items-center gap-2">
+                                        <span>Continue</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- STEP 2 FORM -->
+                            <div id="report-step-2" class="space-y-5 hidden">
+                                <h3 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Journey details</h3>
+                                
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Transport Mode *</label>
+                                        <select class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                            <option value="Suburban Rail">Suburban Rail</option>
+                                            <option value="Metro">Metro Line</option>
+                                            <option value="Bus">City Bus</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Station / Location *</label>
+                                        <select class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                            <option value="CSMT Bus Stand">CSMT Bus Stand</option>
+                                            <option value="Pune Station">Pune Station</option>
+                                            <option value="Dadar Station">Dadar Station</option>
+                                            <option value="Andheri Station">Andheri Station</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Date lost/found *</label>
+                                        <input type="date" value="2026-10-12" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Approximate Time *</label>
+                                        <input type="time" value="10:24" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Route / Train Number <span class="text-slate-400 font-normal">(optional)</span></label>
+                                    <input type="text" placeholder="e.g. Fast Local #95210" class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                </div>
+
+                                <div class="flex justify-between pt-4">
+                                    <button type="button" onclick="nextReportStep(1)" class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50">Back</button>
+                                    <button type="button" onclick="nextReportStep(3)" class="bg-transit-600 hover:bg-transit-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all flex items-center gap-2">
+                                        <span>Continue</span> <i class="fa-solid fa-arrow-right text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- STEP 3 FORM -->
+                            <div id="report-step-3" class="space-y-5 hidden">
+                                <h3 class="text-lg font-bold text-slate-900 border-b border-slate-100 pb-3">Contact & review</h3>
+                                
+                                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Full Name *</label>
+                                        <input type="text" value="Rahul Sharma" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                    </div>
+                                    <div>
+                                        <label class="block text-xs font-semibold text-slate-700 mb-1">Phone Number *</label>
+                                        <input type="tel" value="+91 98765 43210" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-xs font-semibold text-slate-700 mb-1">Email Address *</label>
+                                    <input type="email" value="rahul.sharma@example.com" required class="w-full px-3 py-2.5 bg-slate-50 border border-slate-300 rounded-xl text-sm focus:outline-none">
+                                </div>
+
+                                <div class="bg-slate-50 rounded-2xl p-4 border border-slate-200 text-xs space-y-2">
+                                    <div class="font-bold text-slate-900">Summary of Submission:</div>
+                                    <div class="text-slate-600">Item: Black Backpack • CSMT Bus Stand • Date: 12 Oct 2026</div>
+                                    <div class="text-emerald-700 font-medium"><i class="fa-solid fa-check"></i> AI Match engine enabled for automated scanning.</div>
+                                </div>
+
+                                <div class="flex justify-between pt-4">
+                                    <button type="button" onclick="nextReportStep(2)" class="px-6 py-2.5 border border-slate-300 text-slate-700 rounded-xl text-sm font-semibold hover:bg-slate-50">Back</button>
+                                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-sm font-semibold shadow-sm transition-all flex items-center gap-2">
+                                        <span>Submit Report</span> <i class="fa-solid fa-check text-xs"></i>
+                                    </button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <!-- Tips Sidebar -->
+                    <div class="space-y-6">
+                        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <h4 class="font-bold text-slate-900 mb-4 flex items-center gap-2">
+                                <i class="fa-solid fa-lightbulb text-amber-500"></i> Tips for a better match
+                            </h4>
+                            <ul class="space-y-3 text-xs text-slate-600">
+                                <li class="flex items-start gap-2.5">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                                    <span>Upload clear, well-lit photos (from multiple angles if possible).</span>
+                                </li>
+                                <li class="flex items-start gap-2.5">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                                    <span>Include distinctive details (e.g. tags, stickers, scratches).</span>
+                                </li>
+                                <li class="flex items-start gap-2.5">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                                    <span>Provide accurate route, station and date/time.</span>
+                                </li>
+                                <li class="flex items-start gap-2.5">
+                                    <i class="fa-solid fa-circle-check text-emerald-600 mt-0.5"></i>
+                                    <span class="font-semibold text-slate-900">The more details you add, the higher the match accuracy.</span>
+                                </li>
+                            </ul>
+                            <div class="mt-6 pt-4 border-t border-slate-100">
+                                <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=400&q=80" alt="Backpack Example" class="w-full h-32 object-cover rounded-xl mb-2">
+                                <div class="text-[11px] text-slate-500"><span class="font-bold text-slate-800">Example:</span> Clear image + details = better results</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 4: POTENTIAL MATCH DETAILS VIEW -->
+        <div id="view-details" class="view-section hidden">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <!-- Back Button -->
+                <button onclick="switchView('search')" class="text-slate-600 hover:text-slate-900 text-sm font-semibold flex items-center gap-2 mb-6">
+                    <i class="fa-solid fa-arrow-left"></i> Potential match details
+                </button>
+                <p class="text-xs text-slate-500 mb-6 -mt-4">This item looks similar to your report. Review the details and confirm if it's yours.</p>
+
+                <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+                    <!-- Left Column: Image & Location -->
+                    <div class="lg:col-span-5 space-y-6">
+                        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                            <div class="relative rounded-xl overflow-hidden h-72 mb-4 bg-slate-100">
+                                <img id="detail-main-img" src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=800&q=80" alt="Item preview" class="w-full h-full object-cover">
+                            </div>
+                            <div class="grid grid-cols-4 gap-2">
+                                <img src="https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=200&q=80" class="rounded-lg h-16 object-cover cursor-pointer border-2 border-transit-600">
+                                <img src="https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?auto=format&fit=crop&w=200&q=80" class="rounded-lg h-16 object-cover cursor-pointer border border-slate-200 opacity-70">
+                                <img src="https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=200&q=80" class="rounded-lg h-16 object-cover cursor-pointer border border-slate-200 opacity-70">
+                                <div class="rounded-lg h-16 bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-600 border border-slate-200">+2</div>
+                            </div>
+                        </div>
+
+                        <!-- Location Context Box -->
+                        <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200">
+                            <div class="flex items-center justify-between mb-3">
+                                <h4 class="font-bold text-slate-900 text-sm flex items-center gap-2">
+                                    <i class="fa-solid fa-map-location-dot text-transit-600"></i> Location context
+                                </h4>
+                                <a href="#" class="text-xs text-transit-600 font-semibold hover:underline">View on map</a>
+                            </div>
+                            <div class="p-3 bg-slate-50 rounded-xl border border-slate-200 text-xs space-y-1">
+                                <div class="font-bold text-slate-900">CSMT Bus Stand, Mumbai</div>
+                                <div class="text-slate-500">Near Platform 1 • Bus Stand Area</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Middle Column: Attributes & Claim -->
+                    <div class="lg:col-span-7 space-y-6">
+                        <div class="bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <div class="flex justify-between items-start mb-4">
+                                <div>
+                                    <h2 id="detail-title" class="text-2xl font-extrabold text-slate-900">Black Backpack</h2>
+                                    <span class="inline-block mt-2 bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs px-3 py-1 rounded-full font-bold">
+                                        <i class="fa-solid fa-bolt mr-1"></i> AI match 94%
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Attributes List -->
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 py-4 border-y border-slate-100 text-xs">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-box"></i></div>
+                                    <div>
+                                        <div class="text-slate-400">Category</div>
+                                        <div class="font-semibold text-slate-900">Backpack</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-palette"></i></div>
+                                    <div>
+                                        <div class="text-slate-400">Color</div>
+                                        <div class="font-semibold text-slate-900">Black</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-tag"></i></div>
+                                    <div>
+                                        <div class="text-slate-400">Brand</div>
+                                        <div class="font-semibold text-slate-900">Skybags (possible)</div>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3">
+                                    <div class="w-8 h-8 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center"><i class="fa-regular fa-clock"></i></div>
+                                    <div>
+                                        <div class="text-slate-400">Date & time</div>
+                                        <div class="font-semibold text-slate-900">12 Oct 2026, 10:24 AM</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="mt-4 space-y-1">
+                                <div class="text-xs font-bold text-slate-900">Additional details</div>
+                                <p class="text-xs text-slate-600">Small side pocket, red tag, slightly worn bottom.</p>
+                            </div>
+                        </div>
+
+                        <!-- Match Proof Box -->
+                        <div class="bg-transit-50 border border-transit-100 rounded-2xl p-6">
+                            <div class="flex flex-col sm:flex-row items-center gap-6">
+                                <div class="relative w-24 h-24 flex items-center justify-center rounded-full bg-white shadow-sm border-4 border-transit-500">
+                                    <span class="text-2xl font-extrabold text-transit-700">94%</span>
+                                </div>
+                                <div class="space-y-2 flex-grow text-center sm:text-left">
+                                    <h4 class="font-bold text-slate-900 text-base">This might be yours!</h4>
+                                    <p class="text-xs text-slate-600">The item matches your report with high similarity.</p>
+                                    <div class="text-[11px] text-slate-500"><i class="fa-solid fa-circle-info text-transit-600"></i> Similarity score is an AI estimate, not a guarantee of a match.</div>
+                                </div>
+                            </div>
+
+                            <div class="mt-6 pt-4 border-t border-transit-100 grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-slate-700">
+                                <div class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-600"></i> Item category (Backpack)</div>
+                                <div class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-600"></i> Color (Black)</div>
+                                <div class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-600"></i> Location (CSMT Bus Stand)</div>
+                                <div class="flex items-center gap-2"><i class="fa-solid fa-check text-emerald-600"></i> Date & time (12 Oct 2026, 10:24 AM)</div>
+                            </div>
+
+                            <div class="mt-6 flex flex-col sm:flex-row gap-3">
+                                <button onclick="openClaimModal('Black Backpack')" class="flex-1 bg-transit-600 hover:bg-transit-700 text-white font-semibold py-3 px-6 rounded-xl text-sm shadow-sm transition-all flex items-center justify-center gap-2">
+                                    <i class="fa-solid fa-shield-halved"></i> Start secure claim
+                                </button>
+                                <button onclick="switchView('search')" class="px-6 py-3 bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 font-semibold rounded-xl text-sm transition-all">
+                                    Not a match
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="text-[11px] text-slate-400 flex items-center gap-2 justify-center">
+                            <i class="fa-solid fa-lock"></i>
+                            <span>Do not share sensitive information publicly. Verify ownership before handover.</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW 5: TRANSIT TEAMS OPERATIONS OVERVIEW -->
+        <div id="view-operations" class="view-section hidden">
+            <div class="flex min-h-[calc(100vh-4rem)]">
+                <!-- Sidebar -->
+                <aside class="w-64 bg-white border-r border-slate-200 p-4 hidden md:block shrink-0">
+                    <div class="space-y-1">
+                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold bg-transit-50 text-transit-700">
+                            <i class="fa-solid fa-house"></i> Overview
+                        </button>
+                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+                            <i class="fa-solid fa-file-lines"></i> Reports
+                        </button>
+                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+                            <i class="fa-solid fa-bolt"></i> AI Matches
+                        </button>
+                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+                            <i class="fa-solid fa-handshake"></i> Handover Log
+                        </button>
+                        <button class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-slate-600 hover:bg-slate-50">
+                            <i class="fa-solid fa-chart-pie"></i> Analytics
+                        </button>
+                    </div>
+
+                    <div class="mt-8 pt-8 border-t border-slate-100">
+                        <div class="flex items-center justify-between text-xs text-slate-500 mb-2">
+                            <span>Need help?</span>
+                        </div>
+                        <a href="#" class="text-xs font-semibold text-transit-600 flex items-center gap-2"><i class="fa-solid fa-headset"></i> Contact support</a>
+                    </div>
+                </aside>
+
+                <!-- Operations Main Panel -->
+                <div class="flex-grow p-6 lg:p-8">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <div>
+                            <div class="flex items-center gap-2">
+                                <span class="bg-transit-100 text-transit-700 text-xs px-2.5 py-1 rounded-full font-bold">Staff Portal</span>
+                            </div>
+                            <h1 class="text-2xl font-extrabold text-slate-900 mt-1">Operations overview</h1>
+                            <p class="text-xs text-slate-500">Monitor lost and found activity across the transit network.</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <select class="bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-700 focus:outline-none">
+                                <option>Staff v</option>
+                                <option>CSMT Hub</option>
+                                <option>Pune Central</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- KPI Stat Cards -->
+                    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                            <div class="flex items-center justify-between text-slate-500 text-xs mb-2">
+                                <span class="font-medium">Open reports</span>
+                                <div class="w-8 h-8 rounded-xl bg-transit-50 text-transit-600 flex items-center justify-center"><i class="fa-solid fa-folder-open"></i></div>
+                            </div>
+                            <div class="text-3xl font-extrabold text-slate-900 mb-1">18</div>
+                            <div class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-arrow-up"></i> 3 new today</div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                            <div class="flex items-center justify-between text-slate-500 text-xs mb-2">
+                                <span class="font-medium">Matches to review</span>
+                                <div class="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center"><i class="fa-solid fa-bolt"></i></div>
+                            </div>
+                            <div class="text-3xl font-extrabold text-slate-900 mb-1">7</div>
+                            <div class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-arrow-up"></i> 2 high similarity</div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                            <div class="flex items-center justify-between text-slate-500 text-xs mb-2">
+                                <span class="font-medium">Items returned</span>
+                                <div class="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center"><i class="fa-solid fa-circle-check"></i></div>
+                            </div>
+                            <div class="text-3xl font-extrabold text-slate-900 mb-1">24</div>
+                            <div class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-arrow-up"></i> 5 this week</div>
+                        </div>
+
+                        <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200">
+                            <div class="flex items-center justify-between text-slate-500 text-xs mb-2">
+                                <span class="font-medium">Average review time</span>
+                                <div class="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center"><i class="fa-solid fa-clock"></i></div>
+                            </div>
+                            <div class="text-3xl font-extrabold text-slate-900 mb-1">2.3 hrs</div>
+                            <div class="text-xs text-emerald-600 font-semibold"><i class="fa-solid fa-arrow-down"></i> 48% faster</div>
+                        </div>
+                    </div>
+
+                    <!-- Needs Attention Alert -->
+                    <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-center justify-between mb-8 text-sm">
+                        <div class="flex items-center gap-3 text-amber-900">
+                            <i class="fa-solid fa-triangle-exclamation text-amber-600 text-lg"></i>
+                            <div><span class="font-bold">Needs attention:</span> 5 items need review</div>
+                        </div>
+                        <button class="text-xs font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 px-3 py-1.5 rounded-lg transition-all">Review items <i class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+
+                    <!-- Recent Reports Management Table -->
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-8">
+                        <div class="p-5 border-b border-slate-200 flex justify-between items-center">
+                            <h3 class="font-bold text-slate-900 text-base">Recent reports</h3>
+                            <button class="text-xs text-transit-600 font-semibold hover:underline">View all</button>
+                        </div>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-xs text-slate-600">
+                                <thead class="bg-slate-50 uppercase tracking-wider font-semibold text-slate-500 border-b border-slate-200">
+                                    <tr>
+                                        <th class="px-6 py-3">Report ID</th>
+                                        <th class="px-6 py-3">Item</th>
+                                        <th class="px-6 py-3">Location</th>
+                                        <th class="px-6 py-3">Status</th>
+                                        <th class="px-6 py-3">Received</th>
+                                        <th class="px-6 py-3 text-right">Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-100" id="operations-table-body">
+                                    <!-- Populated by JS -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- Weekly Trend & Footer Box -->
+                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div class="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-slate-200">
+                            <div class="flex justify-between items-center mb-4">
+                                <h4 class="font-bold text-slate-900 text-sm">Weekly trend</h4>
+                                <div class="flex items-center gap-4 text-xs text-slate-500">
+                                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-transit-600 rounded"></span> Reports</span>
+                                    <span class="flex items-center gap-1.5"><span class="w-3 h-3 bg-sky-400 rounded"></span> Returned</span>
+                                </div>
+                            </div>
+                            <div class="h-36 flex items-end gap-3 pt-6 border-b border-slate-100 px-4">
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-20"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-14"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Mon</span>
+                                </div>
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-24"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-16"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Tue</span>
+                                </div>
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-16"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-12"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Wed</span>
+                                </div>
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-28"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-20"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Thu</span>
+                                </div>
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-22"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-18"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Fri</span>
+                                </div>
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-26"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-22"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Sat</span>
+                                </div>
+                                <div class="flex-1 flex flex-col items-center gap-2 h-full justify-end">
+                                    <div class="w-full flex gap-1 items-end h-28">
+                                        <div class="w-1/2 bg-transit-600 rounded-t h-18"></div>
+                                        <div class="w-1/2 bg-sky-400 rounded-t h-14"></div>
+                                    </div>
+                                    <span class="text-[10px] text-slate-500 font-medium">Sun</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-transit-50 rounded-2xl p-6 border border-transit-100 flex flex-col justify-between">
+                            <div>
+                                <h4 class="font-bold text-slate-900 text-sm mb-2">Faster matches, happier passengers.</h4>
+                                <p class="text-xs text-slate-600 leading-relaxed">Your work brings people and belongings back together.</p>
+                            </div>
+                            <div class="mt-4 pt-4 border-t border-transit-200 flex items-center gap-2 text-xs font-bold text-transit-700">
+                                <i class="fa-solid fa-bolt text-transit-600"></i> AI Matching Active (v4.2)
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-white border-t border-slate-200 py-6 text-xs text-slate-500">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div class="flex items-center gap-6">
+                <span class="font-bold text-slate-800">TransitFind AI</span>
+                <a href="#" class="hover:text-slate-800">Privacy Policy</a>
+                <a href="#" class="hover:text-slate-800">Accessibility</a>
+            </div>
+            <div class="flex items-center gap-2">
+                <span>Contact Us</span>
+                <a href="mailto:support@transitfind.ai" class="text-transit-600 font-medium hover:underline"><i class="fa-regular fa-envelope"></i> support@transitfind.ai</a>
+            </div>
+        </div>
+    </footer>
+
+    <!-- JavaScript Application Logic -->
+    <script>
+        // Mock Database of Items
+        const itemsDatabase = [
+            { id: 'TF-1042', name: 'Black Backpack', category: 'Bags', mode: 'Suburban', station: 'CSMT Bus Stand', date: '2026-10-12', color: 'Black', match: 94, image: 'https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=600&q=80', status: 'Pending', received: '12 Oct 2026' },
+            { id: 'TF-1041', name: 'Laptop Bag (Silver)', category: 'Bags', mode: 'Metro', station: 'Pune Station', date: '2026-10-11', color: 'Silver', match: 87, image: 'https://images.unsplash.com/photo-1622560480605-d83c853bc5c3?auto=format&fit=crop&w=600&q=80', status: 'Matched', received: '11 Oct 2026' },
+            { id: 'TF-1040', name: 'Blue Umbrella', category: 'Accessories', mode: 'Bus', station: 'Dadar Station', date: '2026-10-10', color: 'Blue', match: 82, image: 'https://images.unsplash.com/photo-1548036328-c9fa89d128fa?auto=format&fit=crop&w=600&q=80', status: 'Pending', received: '10 Oct 2026' },
+            { id: 'TF-1039', name: 'Wireless Earbuds', category: 'Electronics', mode: 'Metro', station: 'Andheri Station', date: '2026-10-09', color: 'White', match: 76, image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=600&q=80', status: 'Returned', received: '09 Oct 2026' },
+            { id: 'TF-1038', name: 'Water Bottle', category: 'Bottles', mode: 'Suburban', station: 'Andheri Station', date: '2026-10-08', color: 'Blue', match: 71, image: 'https://images.unsplash.com/photo-1602143407151-7111542de6e8?auto=format&fit=crop&w=600&q=80', status: 'Review', received: '08 Oct 2026' },
+            { id: 'TF-1037', name: 'Tote Bag', category: 'Bags', mode: 'Suburban', station: 'Thane Station', date: '2026-10-07', color: 'Black', match: 65, image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=600&q=80', status: 'Matched', received: '07 Oct 2026' }
+        ];
+
+        // View Switcher Router
+        function switchView(viewName) {
+            document.querySelectorAll('.view-section').forEach(el => el.classList.add('hidden'));
+            document.getElementById(`view-${viewName}`).classList.remove('hidden');
+
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('bg-slate-100', 'text-slate-900'));
+            const activeNav = document.getElementById(`nav-${viewName}`);
+            if (activeNav) {
+                activeNav.classList.add('bg-slate-100', 'text-slate-900');
+            }
+
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+
+            if (viewName === 'home') renderHomeMatches();
+            if (viewName === 'search') renderSearchResults(itemsDatabase);
+            if (viewName === 'operations') renderOperationsTable();
+        }
+
+        // Render Home Potential Matches
+        function renderHomeMatches() {
+            const container = document.getElementById('home-matches-grid');
+            container.innerHTML = itemsDatabase.slice(0, 3).map(item => `
+                <div onclick="openItemDetails('${item.id}')" class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 hover:shadow-md transition-all cursor-pointer group">
+                    <div class="relative rounded-xl overflow-hidden h-48 mb-3 bg-slate-100">
+                        <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover group-hover:scale-105 transition-all">
+                        <span class="absolute top-3 left-3 bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                            <i class="fa-solid fa-bolt"></i> ${item.match}% match
+                        </span>
+                    </div>
+                    <h4 class="font-bold text-slate-900 text-sm mb-1">${item.name}</h4>
+                    <div class="text-xs text-slate-500 space-y-1">
+                        <div class="flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-transit-600"></i> ${item.station}</div>
+                        <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-slate-400"></i> ${item.date}</div>
+                    </div>
+                    <div class="mt-3 pt-3 border-t border-slate-100 flex justify-between items-center text-xs font-semibold text-transit-600">
+                        <span>Potential match</span>
+                        <i class="fa-solid fa-arrow-right group-hover:translate-x-1 transition-transform"></i>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Render Search Results Grid
+        function renderSearchResults(items) {
+            const container = document.getElementById('search-results-grid');
+            document.getElementById('results-count-text').innerText = `Found ${items.length} results`;
+            
+            container.innerHTML = items.map(item => `
+                <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200 hover:shadow-md transition-all flex flex-col justify-between">
+                    <div>
+                        <div class="relative rounded-xl overflow-hidden h-44 mb-3 bg-slate-100">
+                            <img src="${item.image}" alt="${item.name}" class="w-full h-full object-cover">
+                            <span class="absolute top-3 left-3 bg-emerald-50 text-emerald-800 text-[11px] font-bold px-2.5 py-1 rounded-full shadow-sm">
+                                <i class="fa-solid fa-bolt"></i> AI match ${item.match}%
+                            </span>
+                        </div>
+                        <h4 class="font-bold text-slate-900 text-sm mb-1">${item.name}</h4>
+                        <div class="text-xs text-slate-500 space-y-1 mb-3">
+                            <div class="flex items-center gap-1.5"><i class="fa-solid fa-location-dot text-transit-600"></i> ${item.station}</div>
+                            <div class="flex items-center gap-1.5"><i class="fa-regular fa-clock text-slate-400"></i> ${item.date}</div>
+                        </div>
+                    </div>
+                    <button onclick="openItemDetails('${item.id}')" class="w-full py-2 bg-slate-50 hover:bg-transit-50 hover:text-transit-700 text-slate-700 rounded-xl text-xs font-semibold border border-slate-200 transition-all flex items-center justify-center gap-1.5">
+                        <span>View details</span> <i class="fa-solid fa-arrow-right text-[10px]"></i>
+                    </button>
+                </div>
+            `).join('');
+        }
+
+        // Filter Function for Search Page
+        function filterItems() {
+            const category = document.getElementById('filter-category').value;
+            const mode = document.getElementById('filter-mode').value;
+            const station = document.getElementById('filter-station').value;
+            const color = document.getElementById('filter-color').value;
+            const keyword = document.getElementById('search-keyword').value.toLowerCase();
+
+            const filtered = itemsDatabase.filter(item => {
+                if (category && item.category !== category) return false;
+                if (mode && item.mode !== mode) return false;
+                if (station && item.station !== station) return false;
+                if (color && item.color !== color) return false;
+                if (keyword && !item.name.toLowerCase().includes(keyword) && !item.station.toLowerCase().includes(keyword)) return false;
+                return true;
+            });
+
+            renderSearchResults(filtered);
+        }
+
+        function resetFilters() {
+            document.getElementById('filter-category').value = '';
+            document.getElementById('filter-mode').value = '';
+            document.getElementById('filter-station').value = '';
+            document.getElementById('filter-color').value = '';
+            document.getElementById('search-keyword').value = '';
+            renderSearchResults(itemsDatabase);
+            showToast('Filters cleared', 'info');
+        }
+
+        function sortItems(criteria) {
+            let sorted = [...itemsDatabase];
+            if (criteria === 'match') {
+                sorted.sort((a, b) => b.match - a.match);
+            } else if (criteria === 'date') {
+                sorted.sort((a, b) => new Date(b.date) - new Date(a.date));
+            }
+            renderSearchResults(sorted);
+        }
+
+        // Quick Search handler from Hero
+        function executeQuickSearch() {
+            const query = document.getElementById('home-search-input').value;
+            switchView('search');
+            document.getElementById('search-keyword').value = query;
+            filterItems();
+        }
+
+        // Report Wizard Step Switcher
+        function nextReportStep(step) {
+            document.getElementById('report-step-1').classList.add('hidden');
+            document.getElementById('report-step-2').classList.add('hidden');
+            document.getElementById('report-step-3').classList.add('hidden');
+            
+            document.getElementById(`report-step-${step}`).classList.remove('hidden');
+
+            for (let i = 1; i <= 3; i++) {
+                const ind = document.getElementById(`step-indicator-${i}`);
+                if (i === step) {
+                    ind.className = "flex items-center gap-3 p-3 rounded-2xl bg-transit-600 text-white shadow-sm transition-all";
+                    ind.querySelector('div').className = "w-8 h-8 rounded-full bg-white text-transit-700 font-bold flex items-center justify-center text-sm";
+                } else if (i < step) {
+                    ind.className = "flex items-center gap-3 p-3 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 transition-all";
+                    ind.querySelector('div').className = "w-8 h-8 rounded-full bg-emerald-600 text-white font-bold flex items-center justify-center text-sm";
+                } else {
+                    ind.className = "flex items-center gap-3 p-3 rounded-2xl bg-white border border-slate-200 text-slate-700 transition-all";
+                    ind.querySelector('div').className = "w-8 h-8 rounded-full bg-slate-100 text-slate-600 font-bold flex items-center justify-center text-sm";
+                }
+            }
+        }
+
+        function setReportType(type) {
+            console.log("Setting report type:", type);
+        }
+
+        function handleReportSubmit(event) {
+            event.preventDefault();
+            showToast('Item successfully reported! AI matching initiated.', 'success');
+            switchView('search');
+        }
+
+        // Open Item Details View
+        function openItemDetails(id) {
+            const item = itemsDatabase.find(i => i.id === id) || itemsDatabase[0];
+            document.getElementById('detail-title').innerText = item.name;
+            document.getElementById('detail-main-img').src = item.image;
+            switchView('details');
+        }
+
+        // Render Operations Table
+        function renderOperationsTable() {
+            const tbody = document.getElementById('operations-table-body');
+            tbody.innerHTML = itemsDatabase.map(item => `
+                <tr class="hover:bg-slate-50 transition-all">
+                    <td class="px-6 py-4 font-bold text-slate-900">${item.id}</td>
+                    <td class="px-6 py-4 flex items-center gap-3">
+                        <img src="${item.image}" class="w-8 h-8 rounded-lg object-cover">
+                        <span class="font-medium text-slate-900">${item.name}</span>
+                    </td>
+                    <td class="px-6 py-4">${item.station}</td>
+                    <td class="px-6 py-4">
+                        <span class="px-2.5 py-1 rounded-full text-[11px] font-bold ${item.status === 'Matched' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : item.status === 'Returned' ? 'bg-sky-50 text-sky-700 border border-sky-200' : 'bg-amber-50 text-amber-700 border border-amber-200'}">
+                            ${item.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4">${item.received}</td>
+                    <td class="px-6 py-4 text-right">
+                        <button onclick="openItemDetails('${item.id}')" class="px-3 py-1.5 bg-transit-600 hover:bg-transit-700 text-white rounded-lg text-xs font-semibold shadow-sm">Review</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Claim Modal Controls
+        function openClaimModal(itemName) {
+            document.getElementById('claim-item-name').innerText = itemName;
+            document.getElementById('claim-modal').classList.remove('hidden');
+        }
+
+        function closeClaimModal() {
+            document.getElementById('claim-modal').classList.add('hidden');
+        }
+
+        function submitClaim(event) {
+            event.preventDefault();
+            closeClaimModal();
+            showToast('Secure claim submitted successfully! Station security will contact you via SMS.', 'success');
+        }
+
+        // Toast Notification Helper
+        function showToast(message, type = 'success') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `max-w-sm w-full bg-white border ${type === 'success' ? 'border-emerald-500 text-emerald-900' : 'border-slate-300 text-slate-900'} px-4 py-3 rounded-2xl shadow-xl flex items-center gap-3 pointer-events-auto transform translate-y-2 opacity-0 transition-all duration-300`;
+            toast.innerHTML = `
+                <i class="fa-solid ${type === 'success' ? 'fa-circle-check text-emerald-600 text-lg' : 'fa-circle-info text-transit-600 text-lg'}"></i>
+                <div class="text-xs font-medium">${message}</div>
+            `;
+            container.appendChild(toast);
+            setTimeout(() => { toast.classList.remove('translate-y-2', 'opacity-0'); }, 50);
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 4000);
+        }
+
+        // Initialize Home view on load
+        window.onload = function() {
+            switchView('home');
+        };
+    </script>
+</body>
+</html>
